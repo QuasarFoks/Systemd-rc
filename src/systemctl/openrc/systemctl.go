@@ -162,6 +162,8 @@ func main() {
 
 		case "list-units":
 			runCommand("rc-status", "-a")
+		case "daemon-reload":
+			runCommand("rc-service", "openrc", "reload")
 
 		case "list-unit-files":
 			if userFlag {

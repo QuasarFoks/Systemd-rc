@@ -7,6 +7,21 @@ import (
 	"os/exec"
 )
 
+func getLogFile() string {
+	paths := []string{
+		"/var/log/everything.log",
+		"/var/log/messages",
+		"/var/log/syslog",
+		"/var/log/rc.log",
+	}
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return "/var/log/messages"
+}
+
 func main() {
 	var (
 		unit   string
@@ -20,39 +35,21 @@ func main() {
 	flag.Parse()
 
 	if kernel {
-		// journalctl -k → dmesg
-		cmd := exec.Command("dmesg")
+		exec.Command("dmesg").Run()
+		return
+	}
+
+	logFile := getLogFile()
+
+	if unit != "" {
+		// Без -f — просто grep
+		cmd := exec.Command("grep", "-i", unit, logFile)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Run()
 		return
 	}
 
-	// Определяем, откуда брать логи
-	logFile := "/var/log/messages"
-	if _, err := os.Stat("/var/log/rc.log"); err == nil {
-		// Если есть rc.log — он содержит логи запуска служб
-		logFile = "/var/log/rc.log"
-	}
-
-	if unit != "" {
-		if follow {
-			// journalctl -u nginx -f
-			tailCmd := exec.Command("sh", "-c", fmt.Sprintf("tail -F %s | grep --line-buffered -i '%s'", logFile, unit))
-			tailCmd.Stdout = os.Stdout
-			tailCmd.Stderr = os.Stderr
-			tailCmd.Run()
-		} else {
-			// journalctl -u nginx
-			grepCmd := exec.Command("grep", "-i", unit, logFile)
-			grepCmd.Stdout = os.Stdout
-			grepCmd.Stderr = os.Stderr
-			grepCmd.Run()
-		}
-		return
-	}
-
-	// journalctl (без аргументов)
 	if follow {
 		exec.Command("tail", "-F", logFile).Run()
 	} else {

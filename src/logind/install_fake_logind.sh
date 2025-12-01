@@ -60,9 +60,9 @@ dependencies_check() {
 	fi
 }
 install_fake_systemd_logind() {
-	sudo ln -sf /usr/lib/elogind /usr/lib/systemd-logind
-	sudo ln -sf /usr/lib/elogind/libelogind.so.0 /usr/lib/libsystemd.so.0
-	sudo ln -sf /usr/lib/elogind/libelogind.so.0 /usr/lib/libsystemd-logind.so.0
+	ln -sf /usr/lib/elogind /usr/lib/systemd-logind
+	ln -sf /usr/lib/elogind/libelogind.so.0 /usr/lib/libsystemd.so.0
+	ln -sf /usr/lib/elogind/libelogind.so.0 /usr/lib/libsystemd-logind.so.0
 	info "[Systemd-rc]: Good ! "
 }
 main() {

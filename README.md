@@ -35,10 +35,10 @@ systemctl {poweroff|reboot|halt|suspend|hibernate}
 
 ### Зависимости
 
-|runit|dinit|s6|openrc|
-|-----|-----|----|----|
-|go   |go   |go  |go  |
-|elogind|elogind|elogind|elogind|
+|runit  |dinit  |s6     |openrc |Freebsd|
+|-------|-------|-------|-------|-------|
+|  go   |  go   |  g++  |  go   |g++/clang|
+|elogind|elogind|elogind|elogind| NO |
 
 ## Где уже используется 
 

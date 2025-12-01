@@ -23,62 +23,107 @@ for cmd in go cp sudo; do
     fi
 done
 
-# Определяем init-систему
+# Определяем ОС и init
+OS="$(uname -s)"
 init_system=""
 
-# Проверяем системы в порядке приоритета
-if command -v rc-service &> /dev/null && [ -d "/etc/init.d" ]; then
-    init_system="openrc"
-elif command -v dinitctl &> /dev/null && [ -d "/etc/dinit.d" ]; then
-    init_system="dinit"
-elif [ -d "/etc/sv" ] && [ -d "/var/service" ]; then
-    init_system="runit"
+if [ "$OS" = "FreeBSD" ]; then
+    init_system="freebsd-init"
+    info "Обнаружена ОС: FreeBSD"
 else
-    error "Не найдена поддерживаемая init-система (OpenRC, dinit или runit)"
+    # Linux: определяем init
+    if command -v rc-service &> /dev/null && [ -d "/etc/init.d" ]; then
+        init_system="openrc"
+    elif command -v dinitctl &> /dev/null && [ -d "/etc/dinit.d" ]; then
+        init_system="dinit"
+    elif [ -d "/etc/sv" ] && [ -d "/var/service" ]; then
+        init_system="runit"
+    else
+        error "Не найдена поддерживаемая init-система (OpenRC, dinit, runit)"
+    fi
+    info "Обнаружена init-система: $init_system"
 fi
 
-info "Обнаружена init-система: $init_system"
-
-# Пути к исходникам
-SRC_OPENRC="system/openrc/systemctl.go"
-SRC_RUNIT="system/runit/systemctl.go"
-SRC_DINIT="system/dinit/systemctl.go"
+# Пути к исходникам (относительно install-скрипта)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BINARY_NAME="systemctl"
 
-# Проверяем наличие нужного файла
+# Определяем исходник и GOOS
 case "$init_system" in
     "openrc")
-        if [ ! -f "$SRC_OPENRC" ]; then
-            error "Файл $SRC_OPENRC не найден"
-        fi
-        SRC_FILE="$SRC_OPENRC"
+        SRC_FILE="$SCRIPT_DIR/src/systemctl/openrc/systemctl.go"
+        GOOS="linux"
         ;;
     "runit")
-        if [ ! -f "$SRC_RUNIT" ]; then
-            error "Файл $SRC_RUNIT не найден"
-        fi
-        SRC_FILE="$SRC_RUNIT"
+        SRC_FILE="$SCRIPT_DIR/src/systemctl/runit/systemctl.go"
+        GOOS="linux"
         ;;
     "dinit")
-        if [ ! -f "$SRC_DINIT" ]; then
-            error "Файл $SRC_DINIT не найден"
+        SRC_FILE="$SCRIPT_DIR/src/systemctl/dinit/systemctl.go"
+        GOOS="linux"
+        ;;
+    "freebsd-init")
+        SRC_FILE="$SCRIPT_DIR/src/systemctl/bsd/main.cpp"
+        # FreeBSD — на C++, не Go
+        if ! command -v clang++ &> /dev/null && ! command -v g++ &> /dev/null; then
+            error "Требуется компилятор C++ (clang++ или g++) для FreeBSD"
         fi
-        SRC_FILE="$SRC_DINIT"
+        info "Сборка для FreeBSD (C++)..."
+        if command -v clang++ &> /dev/null; then
+            cxx="clang++"
+        else
+            cxx="g++"
+        fi
+        "$cxx" -std=c++17 -O2 -s "$SRC_FILE" -o "$BINARY_NAME"
+        sudo install -m 755 "$BINARY_NAME" /usr/local/bin/"$BINARY_NAME"
+        rm -f "$BINARY_NAME"
+        info "Установка man-страницы..."
+        sudo install -Dm644 "$SCRIPT_DIR/man/systemd-rc.1" /usr/local/man/man1/systemd-rc.1 2>/dev/null || \
+        sudo install -Dm644 "$SCRIPT_DIR/man/systemd-rc.1" /usr/local/share/man/man1/systemd-rc.1
+        info "Готово! systemctl установлен для FreeBSD."
+        exit 0
         ;;
     *)
-        error "Неподдерживаемая init-система"
+        error "Неподдерживаемая система: $init_system"
         ;;
 esac
 
-# Сборка
-info "Сборка для $init_system..."
-CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-s -w -extldflags "-static"' -o "$BINARY_NAME" "$SRC_FILE"
+# Проверка Go-исходника
+[ -f "$SRC_FILE" ] || error "Файл не найден: $SRC_FILE"
 
-# Установка
-info "Установка в /usr/local/bin/..."
+# Сборка для Linux (Go)
+info "Сборка для $init_system (Go)..."
+CGO_ENABLED=0 GOOS="$GOOS" go build -a -ldflags '-s -w' -o "$BINARY_NAME" "$SRC_FILE"
+
+# Установка бинарника
+info "Установка systemctl в /usr/local/bin/..."
 sudo install -m 755 "$BINARY_NAME" /usr/local/bin/"$BINARY_NAME"
+
+# Установка man-страницы
+info "Установка man-страницы..."
+sudo install -Dm644 "$SCRIPT_DIR/man/systemd-rc.1" /usr/local/man/man1/systemd-rc.1 2>/dev/null || \
+sudo install -Dm644 "$SCRIPT_DIR/man/systemd-rc.1" /usr/local/share/man/man1/systemd-rc.1
+
+# === УСТАНОВКА FAKE LOGIND (только на Linux) ===
+if [ "$OS" != "FreeBSD" ]; then
+    LOGIND_SCRIPT="$SCRIPT_DIR/src/logind/install_fake_logind.sh"
+    if [ -f "$LOGIND_SCRIPT" ]; then
+        info "Запуск установки fake logind (elogind)..."
+        sudo "$LOGIND_SCRIPT"
+    else
+        info "Скрипт fake logind не найден — пропускаем."
+    fi
+else
+    info "FreeBSD: fake logind не поддерживается — пропускаем."
+fi
 
 # Уборка
 rm -f "$BINARY_NAME"
 
-info "Готово! Утилита systemctl установлена для $init_system."
+info "Готово! systemd-rc установлен для $init_system."
+
+
+# Уборка
+rm -f "$BINARY_NAME"
+
+info "Готово! systemctl установлен для $init_system."

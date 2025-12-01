@@ -133,8 +133,10 @@ func main() {
 	flag.Parse()
 
 	if kernel {
-		dmesg, _ := os.ReadFile("/var/log/dmesg")
-		os.Stdout.Write(dmesg)
+		cmd := exec.Command("dmesg")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Run()
 		return
 	}
 
