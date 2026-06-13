@@ -6,8 +6,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+        "time"
+        "syscall"
 )
-
+const (
+        green = "\033[32m"
+        red   = "\033[31m"
+        reset = "\033[0m"
+)
 // runCommand — запускает команду и выводит stdout/stderr
 func runCommand(name string, arg ...string) error {
 	cmd := exec.Command(name, arg...)
@@ -15,6 +21,10 @@ func runCommand(name string, arg ...string) error {
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
+func isRoot() bool {
+        return os.Geteuid() == 0
+}
+
 
 // isServiceEnabled проверяет, включена ли служба в автозагрузку (runlevel 'default')
 func isServiceEnabled(service string, userMode bool) bool {
@@ -32,6 +42,7 @@ func isServiceEnabled(service string, userMode bool) bool {
 	info, err := os.Lstat(path)
 	return err == nil && info.Mode()&os.ModeSymlink != 0
 }
+
 func Help() {
         fmt.Println("")
         fmt.Println("FLAGS                   Experimental flag ")
@@ -54,6 +65,45 @@ func Help() {
         fmt.Println("suspend 			               ")
         fmt.Println("hibernate                                 ")
         fmt.Println("==========================================")
+}
+func getServiceStartTime(svc string) string {
+        // 1. Читаем PID из pidfile
+        pidfile := fmt.Sprintf("/run/%s.pid", svc)
+        data, err := os.ReadFile(pidfile)
+        if err != nil {
+                return ""
+        }
+
+        pid := strings.TrimSpace(string(data))
+        if pid == "" {
+                return ""
+        }
+
+        // 2. Получаем время создания процесса из /proc
+        procPath := fmt.Sprintf("/proc/%s", pid)
+        var stat syscall.Stat_t
+        if err := syscall.Stat(procPath, &stat); err != nil {
+                return ""
+        }
+
+        // 3. Преобразуем timestamp в читаемый формат
+        startTime := time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)
+        return startTime.Format("2006-01-02 15:04:05")
+}
+func getServiceRunlevel(svc string) string {
+        // Проверяем наличие симлинка в /etc/runlevels/default/
+        defaultPath := "/etc/runlevels/default/" + svc
+                if _, err := os.Stat(defaultPath); err == nil {
+                        return "default"
+                }
+
+                // Можно проверить и другие runlevel-ы, если нужно
+                bootPath := "/etc/runlevels/boot/" + svc
+                if _, err := os.Stat(bootPath); err == nil {
+                        return "boot"
+                }
+
+                return ""
 }
 func main() {
 	if len(os.Args) < 2 {
@@ -126,15 +176,21 @@ func main() {
 				os.Exit(2)
 			}
 			for _, svc := range services {
-				cmd := buildCmd([]string{"rc-update", "add", svc, "default"})
+				cmd := buildCmd([]string{"/usr/bin/rc-update", "add", svc, "default"})
 				runCommand(cmd[0], cmd[1:]...)
 			}
 			if nowFlag {
 				for _, svc := range services {
-					cmd := buildCmd([]string{"rc-service", svc, "start"})
+					cmd := buildCmd([]string{"/usr/bin/rc-service", svc, "start"})
 					runCommand(cmd[0], cmd[1:]...)
 				}
 			}
+			if !isRoot() {
+                                for _, svc := range services {
+                                        cmd := buildCmd([]string{"pkexec", "/usr/bin/rc-update", "add", svc, "default"})
+                                        runCommand(cmd[0], cmd[1:]...)
+                                }
+                        }
 
 		case "disable":
 			if len(services) == 0 {
@@ -142,25 +198,73 @@ func main() {
 				os.Exit(2)
 			}
 			for _, svc := range services {
-				cmd := buildCmd([]string{"rc-update", "del", svc})
+				cmd := buildCmd([]string{"/usr/bin/rc-update", "del", svc})
 				runCommand(cmd[0], cmd[1:]...)
 			}
 			if nowFlag {
 				for _, svc := range services {
-					cmd := buildCmd([]string{"rc-service", svc, "stop"})
+					cmd := buildCmd([]string{"/usr/bin/rc-service", svc,})
 					runCommand(cmd[0], cmd[1:]...)
 				}
 			}
+			if !isRoot() {
+                                for _, svc := range services {
+                                        cmd := buildCmd([]string{"pkexec", "/usr/bin/rc-update", "del", svc})
+                                        runCommand(cmd[0], cmd[1:]...)
+                                }
+                        }
 
-		case "start", "stop", "restart", "reload", "status":
+		case "start", "stop", "restart", "reload":
 			if len(services) == 0 {
 				fmt.Fprintln(os.Stderr, "error: service name required")
 				os.Exit(2)
 			}
 			for _, svc := range services {
-				cmd := buildCmd([]string{"rc-service", svc, command})
+				cmd := buildCmd([]string{"/usr/bin/rc-service", svc, command, "&>","/dev/null"})
 				runCommand(cmd[0], cmd[1:]...)
 			}
+			if !isRoot() {
+                                for _, svc := range services {
+                                        cmd := buildCmd([]string{"pkexec", "/usr/bin/rc-service", svc, command, "&>","/dev/null"})
+                                        runCommand(cmd[0], cmd[1:]...)
+                                }
+                        }
+		case "status":
+                        if len(services) == 0 {
+                                fmt.Fprintln(os.Stderr, "error: service name required")
+                                os.Exit(2)
+                        }
+                        for _, svc := range services {
+                                enabled := isServiceEnabled(svc, userFlag)
+
+                                statusis := "disabled"
+                                runlevel := ""
+                                if enabled {
+                                        statusis = "enabled"
+                                        runlevel = getServiceRunlevel(svc)  // получаем runlevel
+                                }
+
+                                cmd := exec.Command("/usr/bin/rc-service", svc, "status")
+                                err := cmd.Run()
+                                description := "temporary description"
+                                startTime := getServiceStartTime(svc)
+
+
+
+                                if err != nil {
+                                        fmt.Println(red + "○ " + reset, svc+".service -", description)
+                                        fmt.Printf("       Loaded: loaded (%s; %s; Runlevel: %s; vendor preset: Plug)\n",
+                                                   "/etc/init.d/"+svc, statusis, runlevel)
+
+                                } else {
+                                        fmt.Println(green + "● " + reset, svc+".service -", description)
+                                        fmt.Printf("       Loaded: loaded (%s; %s; Runlevel: %s; vendor preset: Plug)\n",
+                                                   "/etc/init.d/"+svc, statusis, runlevel)
+                                         fmt.Printf("       Active: active (running) since %s\n", startTime)
+
+
+                                }
+                        }
 
 		case "is-enabled":
 			if len(services) == 0 {
@@ -183,15 +287,15 @@ func main() {
 			}
 
 		case "list-units":
-			runCommand("rc-status", "-a")
+			runCommand("/usr/bin/rc-status", "-a")
 		case "daemon-reload":
-			runCommand("rc-update", "-u")
+			runCommand("/usr/bin/rc-update", "-u")
 
 		case "list-unit-files":
 			if userFlag {
-				runCommand("rc-update", "--user", "show")
+				runCommand("/usr/bin/rc-update", "--user", "show")
 			} else {
-				runCommand("rc-update", "show")
+				runCommand("/usr/bin/rc-update", "show")
 			}
 
 		case "halt":
