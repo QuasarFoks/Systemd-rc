@@ -10,8 +10,8 @@
 </div>
 <div align="center">
 
-[![Сайт](https://img.shields.io/badge/🌐-Официальный_сайт-2D2B55?style=for-the-badge&logo=google-chrome)](https://b-e-n-z1342.github.io/SystemdRC)
-[![GitLab](https://img.shields.io/badge/💻-Исходный_код-FF6C37?style=for-the-badge&logo=gitlab)](https://gitlab.com/Quasar_benz/Systemd-rc)
+[![Сайт](https://img.shields.io/badge/🌐-Официальный_сайт-2D2B55?style=for-the-badge&logo=google-chrome)](https://quasarfoks.github.io/SystemdRC)
+
 
 </div>
 
@@ -21,7 +21,7 @@ Systemd-rc преобразует команды systemd в эквивалент
 ⚠️ **Важно**: утилита не эмулирует systemd, а только транслирует команды. На данный момент не поддерживается преобразование скриптов и конфигурационных файлов.
 ## установка
 ```
-git clone https://github.com/b-e-n-z1342/Systemd-rc.git
+git clone https://github.com/QuasarFoks/Systemd-rc.git
 cd Systemd-rc
 ./install
 ```
@@ -42,8 +42,8 @@ systemctl {poweroff|reboot|halt|suspend|hibernate}
 
 ## Где уже используется 
 
-[QuasarLinux](https://b-e-n-z1342.github.io/QuasarLinux)
+[QuasarLinux](https://QuasarFoks.github.io/QuasarLinux)
 
-[Wiki](https://github.com/b-e-n-z1342/Systemd-rc/wiki)
+[Wiki](https://github.com/QuasarFoks/Systemd-rc/wiki)
 
-[Wiki по коду](https://github.com/b-e-n-z1342/Systemd-rc/wiki/devel)
+[Wiki по коду](https://github.com/QuasarFoks/Systemd-rc/wiki/devel)

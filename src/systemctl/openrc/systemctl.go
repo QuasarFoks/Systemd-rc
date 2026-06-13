@@ -32,7 +32,29 @@ func isServiceEnabled(service string, userMode bool) bool {
 	info, err := os.Lstat(path)
 	return err == nil && info.Mode()&os.ModeSymlink != 0
 }
-
+func Help() {
+        fmt.Println("")
+        fmt.Println("FLAGS                   Experimental flag ")
+        fmt.Println("============Service management============")
+        fmt.Println("enable       {SERVICE}     --now/--user   ")
+        fmt.Println("disable      {SERVICE}     --now/--user   ")
+        fmt.Println("status       {SERVICE}                    ")
+        fmt.Println("restart      {SERVICE}       --user       ")
+        fmt.Println("reload       {SERVICE}       --user       ")
+        fmt.Println("stop         {SERVICE}       --user       ")
+        fmt.Println("start        {SERVICE}       --user       ")
+        fmt.Println("is-enabled   {SERVICE}       --user       ")
+        fmt.Println("daemon-reload 			       ")
+        fmt.Println("list-unit 			               ")
+        fmt.Println("list-unit-files              --user       ")
+        fmt.Println("=============Power management=============")
+        fmt.Println("halt			               ")
+        fmt.Println("poweroff 			               ")
+        fmt.Println("reboot 		                       ")
+        fmt.Println("suspend 			               ")
+        fmt.Println("hibernate                                 ")
+        fmt.Println("==========================================")
+}
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "Usage: systemctl [OPTIONS...] COMMAND [SERVICE...]")
@@ -182,7 +204,8 @@ func main() {
 			runCommand("loginctl", "suspend")
 		case "hibernate":
 			runCommand("loginctl", "hibernate")
-
+		case "help":
+			Help()
 		default:
 			fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
 			os.Exit(2)

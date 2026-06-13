@@ -1,0 +1,93 @@
+.TH SYSTEMD-RC 1 "December 2025" "QuasarFoks" "User Commands"
+.SH NAME
+systemd-rc \- systemd-compatible CLI shims for non-systemd init systems
+.SH SYNOPSIS
+.B systemd-rc
+.RB [ install ]
+.SH DESCRIPTION
+\fBsystemd-rc\fR provides drop-in replacements for common \fBsystemd\fR command-line tools
+(\fBsystemctl\fR, \fBloginctl\fR, \fBjournalctl\fR) that translate systemd-style invocations
+into native commands for alternative init systems: OpenRC, runit, dinit, and s6.
+
+Its purpose is to maintain compatibility with software and scripts that expect \fBsystemctl\fR,
+without requiring the \fBsystemd\fR suite.
+.SH INSTALLATION
+From source:
+.PP
+.RS
+.nf
+git clone https://github.com/QuasarFoks/systemd-rc
+cd systemd-rc
+sudo ./install
+.fi
+.RE
+
+Installs binaries to \fB/usr/local/bin/\fR.
+.SH COMPONENTS
+.SS systemctl
+Emulates essential \fBsystemctl\fR functionality for service management.
+
+Supported commands:
+.TP
+\fBstart\fR, \fBstop\fR, \fBrestart\fR, \fBreload\fR, \fBstatus\fR
+Control services via native init (e.g., \fBrc-service\fR).
+.TP
+\fBenable\fR, \fBdisable\fR
+Manage boot-time activation (e.g., \fBrc-update\fR).
+.TP
+\fBis-enabled\fR
+Check if a unit is enabled.
+.TP
+\fBlist-units\fR, \fBlist-unit-files\fR
+List active units and installed unit files.
+.TP
+\fB--now\fR
+Immediately start/stop service after enable/disable.
+.TP
+\fB--user\fR
+Manage per-user services (via \fB~/.local/share/openrc/\fR on OpenRC).
+.TP
+System commands: \fBhalt\fR, \fBpoweroff\fR, \fBreboot\fR, \fBsuspend\fR, \fBhibernate\fR
+Forwarded to system utilities or \fBloginctl\fR (via elogind).
+
+Examples:
+.PP
+.RS
+.nf
+systemctl --now enable sshd
+systemctl --user start myapp
+systemctl is-enabled nginx
+.fi
+.RE
+
+.SS loginctl
+Minimal wrapper for elogind-compatible session control:
+.RS
+.TP
+\fBsuspend\fR, \fBhibernate\fR
+Executes \fBloginctl suspend\fR / \fBhibernate\fR (requires \fBelogind\fR).
+.RE
+
+.SS journalctl
+Text-based log reader over syslog:
+.RS
+.TP
+\fBjournalctl -u <service>\fR
+Filters logs by service name (searches \fB/var/log/messages\fR or equivalent).
+.TP
+No arguments → shows last 100 log lines.
+.RE
+.SH DEPENDENCIES
+For full functionality, the following are required:
+.RS
+.TP
+\(bu A supported init system: OpenRC, runit, dinit, s6, or freebsd-init
+.TP
+\(bu \fBelogind\fR (for suspend/hibernate and user sessions)
+.TP
+\(bu D-Bus and polkit
+.RE
+.SH AUTHOR
+QuasarFoks — https://github.com/QuasarFoks/systemd-rc
+.SH LICENSE
+GNU/GPLv3

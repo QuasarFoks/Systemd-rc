@@ -1,0 +1,89 @@
+.TH SYSTEMD-RC 1 "December 2025" "QuasarFoks" "User Commands"
+.SH NAME
+systemd-rc \- шим-утилиты для эмуляции systemd-команд на системах без systemd
+.SH ОПИСАНИЕ
+\fBsystemd-rc\fR — это набор совместимых по CLI утилит (\fBsystemctl\fR, \fBloginctl\fR, \fBjournalctl\fR),
+которые переводят вызовы systemd-стиля в команды нативных init-систем: OpenRC, runit, dinit, s6.
+
+Цель — обеспечить совместимость с софтом и скриптами, требующими \fBsystemctl\fR,
+без установки самого \fBsystemd\fR.
+.SH УСТАНОВКА
+Из исходников:
+.PP
+.RS
+.nf
+git clone https://github.com/QuasarFoks/systemd-rc
+cd systemd-rc
+sudo ./install
+.fi
+.RE
+
+Установка размещает бинарники в \fB/usr/local/bin/\fR.
+.SH КОМПОНЕНТЫ
+.SS systemctl
+Эмулирует основные команды \fBsystemctl\fR для управления сервисами.
+
+Поддерживаемые команды:
+.TP
+\fBstart\fR, \fBstop\fR, \fBrestart\fR, \fBreload\fR, \fBstatus\fR
+Запуск, остановка и управление сервисами через \fBrc-service\fR.
+.TP
+\fBenable\fR, \fBdisable\fR
+Добавление/удаление сервисов из автозагрузки (\fBrc-update\fR).
+.TP
+\fBis-enabled\fR
+Проверка, включён ли сервис.
+.TP
+\fBlist-units\fR, \fBlist-unit-files\fR
+Отображение активных сервисов и установленных unit-файлов.
+.TP
+\fB--now\fR
+Флаг: сразу запустить/остановить сервис после enable/disable.
+.TP
+\fB--user\fR
+Управление пользовательскими сервисами (через \fB~/.local/share/openrc/\fR).
+.TP
+Системные команды: \fBhalt\fR, \fBpoweroff\fR, \fBreboot\fR, \fBsuspend\fR, \fBhibernate\fR
+Передаются в системные утилиты или \fBloginctl\fR (через elogind).
+
+Примеры:
+.PP
+.RS
+.nf
+systemctl --now enable sshd
+systemctl --user start myapp
+systemctl is-enabled nginx
+.fi
+.RE
+
+.SS loginctl (через elogind)
+Поддерживает:
+.RS
+.TP
+\fBsuspend\fR, \fBhibernate\fR
+Вызывает \fBloginctl suspend\fR / \fBhibernate\fR (требуется \fBelogind\fR).
+.RE
+
+.SS journalctl
+Простой текстовый логгер поверх syslog:
+.RS
+.TP
+\fBjournalctl -u <service>\fR
+Фильтр логов по имени сервиса (ищет в \fB/var/log/messages\fR).
+.TP
+Без аргументов — показывает последние 100 строк лога.
+.RE
+.SH ЗАВИСИМОСТИ
+Для полной функциональности требуется:
+.RS
+.TP
+• OpenRC, runit, dinit, s6 или FreeBSD-init (в зависимости от сборки)
+.TP
+• \fBelogind\fR (для suspend/hibernate и --user-сессий)
+.TP
+• \fBdbus\fR, \fBpolkit\fR
+.RE
+.SH АВТОР
+QuasarFoks — https://github.com/QuasarFoks/systemd-rc
+.SH ЛИЦЕНЗИЯ
+GNU/GPLv3
