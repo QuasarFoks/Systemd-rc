@@ -11,6 +11,24 @@ func runCommand(name string, arg ...string) error {
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
+func runCommandF(name string, arg ...string) error {
+	cmd := exec.Command(name, arg...)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	err := cmd.Run()
+        if err != nil {
+                if exitErr, ok := err.(*exec.ExitError); ok {
+                        return exitErr.ExitCode()
+                }
+                return -1
+        }
+        return 0
+}
+
+func isRoot() bool {
+	return os.Geteuid() == 0
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: systemd-rc <command> [service]")
@@ -25,19 +43,64 @@ func main() {
  
 	switch command {
 	case "enable":
-		runCommand("sv", "enable", service)
+		if (!isRoot) {
+			runCommandF("pkexec", "/usr/bin/sv", "enable", service)
+                        err := runCommandF()
+                        if err == 0 {
+                                fmt.Println("Created symlink", "/etc/service/" + service, "--> /etc/sv/" + service)
+                        } else {
+                                os.exit(0)
+                        }
+		} else {
+			runCommandF("/usr/bin/sv", "enable", service)
+                        err := runCommandF()
+                        if err == 0 {
+                                fmt.Println("Created symlink", "/etc/service/" + service, "--> /etc/sv/" + service)
+                        } else {
+                                os.exit(0)
+                        }
+		}
+
 	case "disable":
-		runCommand("sv", "disable", service)
+                if (!isRoot) {
+                        runCommandF("pkexec", "sv", "disable", service)
+                        err := runCommandF()
+                        if err == 0 {
+                                fmt.Println("Removed /etc/service/" + service)
+                        } else {
+                               os.exit(0)
+                        }
+                } else {
+                        runCommandF("sv", "disable", service)
+                        err := runCommandF()
+                        if err == 0 {
+                                fmt.Println("Removed /etc/service/" + service)
+                        } else {
+                                os.exit(0)
+                        }
+                }
+
 	case "status":
+                if (!isRoot) {
 		runCommand("sv", "status", service)
 	case "start":
-		runCommand("sv", "up", service)
+                if (!isRoot) {
+		runCommandF("sv", "up", service)
 	case "stop":
-		runCommand("sv", "down", service)
+                if (!isRoot) {
+		runCommandF("sv", "down", service)
 	case "reload":
-		runCommand("sv", "hup", service)
+                if (!isRoot) {
+
+                }else {
+
+                }
+		runCommandF("sv", "hup", service)
 	case "restart":
-		runCommand("sv", "restart", service)
+                if (!isRoot) {
+
+                }
+		runCommandF("sv", "restart", service)
 	case "list-units":
 		runCommand("sv", "-l")
 	case "halt":

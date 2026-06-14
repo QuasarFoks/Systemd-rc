@@ -21,6 +21,12 @@ func runCommand(name string, arg ...string) error {
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
+func runCommandF(name string, arg ...string) error {
+	cmd := exec.Command(name, arg...)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	return cmd.Run()
+}
 func isRoot() bool {
         return os.Geteuid() == 0
 }
@@ -220,13 +226,13 @@ func main() {
 				os.Exit(2)
 			}
 			for _, svc := range services {
-				cmd := buildCmd([]string{"/usr/bin/rc-service", svc, command, "&>","/dev/null"})
-				runCommand(cmd[0], cmd[1:]...)
+				cmd := buildCmd([]string{"/usr/bin/rc-service", svc, command})
+				runCommandF(cmd[0], cmd[1:]...)
 			}
 			if !isRoot() {
                                 for _, svc := range services {
-                                        cmd := buildCmd([]string{"pkexec", "/usr/bin/rc-service", svc, command, "&>","/dev/null"})
-                                        runCommand(cmd[0], cmd[1:]...)
+                                        cmd := buildCmd([]string{"pkexec", "/usr/bin/rc-service", svc, command})
+                                        runCommandF(cmd[0], cmd[1:]...)
                                 }
                         }
 		case "status":
