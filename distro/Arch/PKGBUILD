@@ -1,0 +1,35 @@
+pkgname=Systemd-rc
+pkgver=0.3
+pkgrel=1
+pkgdesc='Systemd command converter to Openrc, Runit, S6, Dinit'
+arch=('any')
+url='https://codeberg.org/QuasarFoks/Systemd-rc'
+license=('GPL-3.0-only')
+depends=('go')
+
+makedepends=('go')
+source=("https://github.com/QuasarFoks/Systemd-rc/archive/refs/tags/v$pkgver.tar.gz")
+b2sums=('b09321f92adbc0963296c4cb574b272a6b850d22bd363565e265cd087ab74086fa22e3cb01068bda8b8f6bc8744bc3171abf1b1c437b9cb9868c605c52ea268a')
+
+prepare() {
+    cd "$srcdir/$pkgname-$pkgver"
+    mkdir -p build/usr/local/bin
+    mkdir -p build/usr/local/man
+
+}
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+
+    chmod +x make && ./make
+    cp systemctl build/usr/local/bin/
+    cp man/systemd-rc_ru.1 build/usr/local/man/
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+
+    # Создаем структуру для установки
+    install -Dm755 "systemctl" "$pkgdir/usr/local/bin/systemctl"
+    install -Dm644 "man/systemd-rc_ru.1" "$pkgdir/usr/share/man/man1/systemd-rc.1"
+}

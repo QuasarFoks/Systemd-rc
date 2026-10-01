@@ -1,9 +1,97 @@
-#!/usr/bin/env sh
+#!/bin/bash
 
-############################################################
-# скрипт для использования в QuasarInstall и QuasarBuilder #
-############################################################
+set -e  # выход при первой ошибке
 
+# Цвета для вывода
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+error() {
+    echo -e "${RED}err: $1${NC}" >&2
+    exit 1
+}
+
+info() {
+    echo -e "${GREEN}=> $1${NC}"
+}
+
+# Проверка обязательных утилит
+for cmd in go cp sudo; do
+    if ! command -v "$cmd" &> /dev/null; then
+        error "'$cmd' не установлен"
+    fi
+done
+
+# Определяем ОС и init
+OS="$(uname -s)"
+init_system=""
+
+if [ "$OS" = "FreeBSD" ]; then
+    init_system="freebsd-init"
+    info "Обнаружена ОС: FreeBSD"
+else
+    # Linux: определяем init
+    if command -v rc-service &> /dev/null && [ -d "/etc/init.d" ]; then
+        init_system="openrc"
+    elif command -v dinitctl &> /dev/null && [ -d "/etc/dinit.d" ]; then
+        init_system="dinit"
+    elif [ -d "/etc/sv" ] && [ -d "/var/service" ]; then
+        init_system="runit"
+    else
+        error "Не найдена поддерживаемая init-система (OpenRC, dinit, runit)"
+    fi
+    info "Обнаружена init-система: $init_system"
+fi
+
+# Пути к исходникам (относительно install-скрипта)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SRC_FILE="$SCRIPT_DIR/src/systemctl/openrc/systemctl.go"
-go build -o systemctl "$SRC_FILE"
+BINARY_NAME="systemctl"
+
+# Определяем исходник и GOOS
+case "$init_system" in
+    "openrc")
+        SRC_FILE="$SCRIPT_DIR/src/systemctl/openrc/systemctl.go"
+        GOOS="linux"
+        ;;
+    "runit")
+        SRC_FILE="$SCRIPT_DIR/src/systemctl/runit/systemctl.go"
+        GOOS="linux"
+        ;;
+    "dinit")
+        SRC_FILE="$SCRIPT_DIR/src/systemctl/dinit/systemctl.go"
+        GOOS="linux"
+        ;;
+    "freebsd-init")
+        SRC_FILE="$SCRIPT_DIR/src/systemctl/bsd/main.cpp"
+        # FreeBSD — на C++, не Go
+        if ! command -v clang++ &> /dev/null && ! command -v g++ &> /dev/null; then
+            error "Требуется компилятор C++ (clang++ или g++) для FreeBSD"
+        fi
+        info "Сборка для FreeBSD (C++)..."
+        if command -v clang++ &> /dev/null; then
+            cxx="clang++"
+        else
+            cxx="g++"
+        fi
+        "$cxx" -std=c++17 -O2 -s "$SRC_FILE" -o "$BINARY_NAME"
+        sudo install -m 755 "$BINARY_NAME" /usr/local/bin/"$BINARY_NAME"
+        rm -f "$BINARY_NAME"
+        info "Установка man-страницы..."
+        sudo install -Dm644 "$SCRIPT_DIR/man/systemd-rc.1" /usr/local/man/man1/systemd-rc.1 2>/dev/null || \
+        sudo install -Dm644 "$SCRIPT_DIR/man/systemd-rc.1" /usr/local/share/man/man1/systemd-rc.1
+        info "Готово! systemctl установлен для FreeBSD."
+        exit 0
+        ;;
+    *)
+        error "Неподдерживаемая система: $init_system"
+        ;;
+esac
+
+# Проверка Go-исходника
+[ -f "$SRC_FILE" ] || error "Файл не найден: $SRC_FILE"
+
+# Сборка для Linux (Go)
+info "Сборка для $init_system (Go)..."
+CGO_ENABLED=0 GOOS="$GOOS" go build -a -ldflags '-s -w' -o "$BINARY_NAME" "$SRC_FILE"
+cp $BINARY_NAME build/usr/local/bin/
