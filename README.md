@@ -54,4 +54,3 @@ systemctl {poweroff|reboot|halt|suspend|hibernate}
 
 [Wiki](https://github.com/QuasarFoks/Systemd-rc/wiki)
 
-[Wiki по коду](https://github.com/QuasarFoks/Systemd-rc/wiki/devel)
