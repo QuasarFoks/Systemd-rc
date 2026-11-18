@@ -23,7 +23,15 @@ Systemd-rc преобразует команды systemd в эквивалент
 ```
 git clone https://github.com/QuasarFoks/Systemd-rc.git
 cd Systemd-rc
-./install
+autoreconf -fi
+
+mkdir -v build
+cd       build
+../configure             \
+    --prefix=/usr        \
+    --with-init=<ВАШ INIT>
+make 
+make install 
 ```
 
 ## команды
@@ -37,7 +45,7 @@ systemctl {poweroff|reboot|halt|suspend|hibernate}
 
 |runit  |dinit  |s6     |openrc |Freebsd|
 |-------|-------|-------|-------|-------|
-|  go   |  go   |  g++  |  go   |g++/clang|
+|  g++/clang   |  g++/clang   |  g++/clang  |  g++/clang   |g++/clang|
 |elogind|elogind|elogind|elogind| NO |
 
 ## Где уже используется 
